@@ -1,7 +1,6 @@
 "use client"
 
-import React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,24 +50,75 @@ interface MonthlyReport {
   savedDate: string
 }
 
-export default function ExpensesApp() {
-  const [expenses, setExpenses] = useState<ExpenseCategory[]>([
-    { id: "house", name: "House", weeklyBudget: 350, monthlyBudget: 1400, weeklySpent: 0, monthlySpent: 0 },
-    { id: "insurance", name: "Insurance", weeklyBudget: 125, monthlyBudget: 500, weeklySpent: 0, monthlySpent: 0 },
-    { id: "car", name: "Car", weeklyBudget: 150, monthlyBudget: 600, weeklySpent: 0, monthlySpent: 0 },
-    { id: "gas", name: "Gasoline", weeklyBudget: 100, monthlyBudget: 400, weeklySpent: 0, monthlySpent: 0 },
-  ])
+// Helper function to safely get data from localStorage
+const getFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window === "undefined") return defaultValue
+  try {
+    const item = window.localStorage.getItem(key)
+    return item ? JSON.parse(item) : defaultValue
+  } catch (error) {
+    console.error(`Error reading localStorage key "${key}":`, error)
+    return defaultValue
+  }
+}
 
-  const [weeklyIncomeGoal, setWeeklyIncomeGoal] = useState(750)
-  const [currentWeekIncome, setCurrentWeekIncome] = useState(0)
-  const [weeklyIncomeHistory, setWeeklyIncomeHistory] = useState<WeeklyIncome[]>([])
+// Helper function to safely set data to localStorage
+const setToLocalStorage = <T,>(key: string, value: T): void => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch (error) {
+    console.error(`Error setting localStorage key "${key}":`, error)
+  }
+}
+
+export default function ExpensesApp() {
+  const [expenses, setExpenses] = useState<ExpenseCategory[]>(() =>
+    getFromLocalStorage("expenses", [
+      { id: "house", name: "House", weeklyBudget: 350, monthlyBudget: 1400, weeklySpent: 0, monthlySpent: 0 },
+      { id: "insurance", name: "Insurance", weeklyBudget: 125, monthlyBudget: 500, weeklySpent: 0, monthlySpent: 0 },
+      { id: "car", name: "Car", weeklyBudget: 150, monthlyBudget: 600, weeklySpent: 0, monthlySpent: 0 },
+      { id: "gas", name: "Gasoline", weeklyBudget: 100, monthlyBudget: 400, weeklySpent: 0, monthlySpent: 0 },
+    ]),
+  )
+
+  const [weeklyIncomeGoal, setWeeklyIncomeGoal] = useState(() => getFromLocalStorage("weeklyIncomeGoal", 750))
+
+  const [currentWeekIncome, setCurrentWeekIncome] = useState(() => getFromLocalStorage("currentWeekIncome", 0))
+
+  const [weeklyIncomeHistory, setWeeklyIncomeHistory] = useState<WeeklyIncome[]>(() =>
+    getFromLocalStorage("weeklyIncomeHistory", []),
+  )
 
   const [editingExpense, setEditingExpense] = useState<ExpenseCategory | null>(null)
+  // const [editingIncome, setEditingIncome] = useState(false)
   const [addExpenseAmount, setAddExpenseAmount] = useState("")
   const [selectedExpenseId, setSelectedExpenseId] = useState("")
 
-  const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>([])
+  const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>(() => getFromLocalStorage("monthlyReports", []))
+
   const [showAutoSaveMessage, setShowAutoSaveMessage] = useState(false)
+
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    setToLocalStorage("expenses", expenses)
+  }, [expenses])
+
+  useEffect(() => {
+    setToLocalStorage("weeklyIncomeGoal", weeklyIncomeGoal)
+  }, [weeklyIncomeGoal])
+
+  useEffect(() => {
+    setToLocalStorage("currentWeekIncome", currentWeekIncome)
+  }, [currentWeekIncome])
+
+  useEffect(() => {
+    setToLocalStorage("weeklyIncomeHistory", weeklyIncomeHistory)
+  }, [weeklyIncomeHistory])
+
+  useEffect(() => {
+    setToLocalStorage("monthlyReports", monthlyReports)
+  }, [monthlyReports])
 
   const getCurrentWeek = () => {
     const now = new Date()
@@ -125,6 +175,13 @@ export default function ExpensesApp() {
     return "text-red-600"
   }
 
+  // const getProgressColor = (spent: number, budget: number) => {
+  //   const percentage = (spent / budget) * 100
+  //   if (percentage <= 80) return "bg-green-500"
+  //   if (percentage <= 100) return "bg-yellow-500"
+  //   return "bg-red-500"
+  // }
+
   const getMonthName = (monthIndex: number) => {
     const months = [
       "January",
@@ -149,6 +206,7 @@ export default function ExpensesApp() {
 
     if (isSecondOfMonth) {
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1)
+      // const monthKey = `${lastMonth.getFullYear()}-${lastMonth.getMonth()}`
 
       // Check if we already saved this month
       const existingReport = monthlyReports.find(
@@ -199,7 +257,7 @@ export default function ExpensesApp() {
     setExpenses((prev) => prev.map((exp) => ({ ...exp, monthlySpent: 0 })))
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     checkAndSaveMonthlyReport()
   }, [monthlyReports, weeklyIncomeHistory, expenses])
 
